@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词射击游戏</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="game-controls">
+            <button id="startButton" class="game-button">开始游戏</button>
+            <button id="endButton" class="game-button">结束游戏</button>
+        </div>
+        <div id="gameOverModal" class="modal">
+            <div class="modal-content">
+                <h2>Game Over</h2>
+                <div class="modal-buttons">
+                    <button id="restartButton" class="game-button">重新开始</button>
+                    <button id="quitButton" class="game-button">结束游戏</button>
+                </div>
+            </div>
+        </div>
+        <div id="uploadSuccessModal" class="modal">
+            <div class="modal-content">
+                <h2>上传成功</h2>
+                <p>单词库已更新！</p>
+                <div class="modal-buttons">
+                    <button id="uploadOkButton" class="game-button">确定</button>
+                </div>
+            </div>
+        </div>
+        <div class="settings-panel" id="settingsPanel">
+            <h2>游戏设置</h2>
+            <div class="setting-item">
+                <label for="wordSpeed">单词下落速度:</label>
+                <input type="range" id="wordSpeed" min="0.5" max="3" step="0.1" value="1">
+                <span id="wordSpeedValue">1</span>
+            </div>
+            <div class="setting-item">
+                <label for="playerSpeed">飞机移动速度:</label>
+                <input type="range" id="playerSpeed" min="10" max="30" step="2" value="20">
+                <span id="playerSpeedValue">20</span>
+            </div>
+            <div class="setting-item">
+                <label for="wordFile">上传单词文件 (CSV):</label>
+                <input type="file" id="wordFile" accept=".csv">
+            </div>
+        </div>
+        <button id="settingsButton" class="settings-button">⚙️ 设置</button>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
