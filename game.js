@@ -8,7 +8,10 @@ const BULLET_HEIGHT = 10;
 const INITIAL_LIVES = 1; // 初始生命值
 const MISSILE_WIDTH = 10;
 const MISSILE_HEIGHT = 20;
+const BOMB_WIDTH = 16;
+const BOMB_HEIGHT = 28;
 const CONSECUTIVE_HITS_FOR_MISSILE = 5; // 连续命中次数获得导弹
+const CONSECUTIVE_MISSLE_FOR_BOMB = 2; // 导弹数获得炸弹
 
 // 星空背景配置
 const STAR_COUNT = 60; // 星星数量
@@ -21,15 +24,33 @@ const shootSound = new Audio('bullet.mp3');
 const blastSound = new Audio('blast.mp3');
 const loseSound = new Audio('lose.mp3');
 const missileSound = new Audio('missile.mp3');
+const bombSound = new Audio('bomb.mp3');
 shootSound.volume = 0.2; // 设置音量为20%
 blastSound.volume = 0.2; // 设置爆炸音效音量
 loseSound.volume = 0.4; // 设置失败音效音量
 missileSound.volume = 0.3; // 设置导弹音效音量
+bombSound.volume = 0.5; // 设置炸弹音效音量
 
 // 粒子系统
 let particles = [];
-const PARTICLE_COUNT = 20; // 每次爆炸产生的粒子数量
-const PARTICLE_LIFE = 30; // 粒子生命周期（帧数）
+const MAX_PARTICLES = 300; // 最大粒子数量限制
+const PARTICLE_COUNT = 15; // 每次爆炸产生的粒子数量
+const PARTICLE_LIFE = 25; // 粒子生命周期（帧数）
+
+// 粒子对象池
+const particlePool = [];
+
+// 获取粒子对象
+function getParticle() {
+    return particlePool.pop() || {};
+}
+
+// 回收粒子对象
+function recycleParticle(particle) {
+    if (particlePool.length < MAX_PARTICLES) {
+        particlePool.push(particle);
+    }
+}
 
 // 记录已出现的单词
 let usedWords = new Set();
@@ -69,6 +90,7 @@ let player = {
 let lives = INITIAL_LIVES; // 当前生命值
 let consecutiveHits = 0; // 连续命中次数
 let missilesNum = 0; // 导弹数量
+let bombNum = 0; // 炸弹数量
 
 let bullets = [];
 let currentEnWord = '';
@@ -130,6 +152,7 @@ function startGame() {
         player.x = CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2;
         lives = INITIAL_LIVES; // 重置生命值
         missilesNum = 0; // 重置导弹数量
+        bombNum = 0; // 重置炸弹数量
         consecutiveHits = 0; // 重置连续命中次数
         usedWords.clear(); // 清空已使用单词记录
         
@@ -347,9 +370,84 @@ function handleKeyPress(event) {
                 missileSound.play(); // 播放导弹音效
             }
             break;
+        case 's': // s键发射炸弹
+        case 'S':
+            if (bombNum > 0) {
+                bombNum--;
+                bullets.push({
+                    x: player.x + PLAYER_WIDTH / 2 - BOMB_WIDTH / 2,
+                    y: player.y,
+                    isBomb: true
+                });
+                bombSound.currentTime = 0;
+                bombSound.play(); // 播放炸弹音效
+            }
+            break;
     }
 }
 
+function createBombExplosion(x, y) {
+    if (particles.length >= MAX_PARTICLES) return;
+
+    const totalParticles = Math.min(PARTICLE_COUNT * 3.5, MAX_PARTICLES - particles.length);
+    const centerCount = Math.floor(totalParticles * 0.4);
+    const waveCount = Math.floor(totalParticles * 0.4);
+    const flashCount = Math.floor(totalParticles * 0.2);
+
+    // 中心爆炸圈
+    for (let i = 0; i < centerCount; i++) {
+        const angle = (Math.PI * 2 / centerCount) * i;
+        const speed = Math.random() * 3 + 4;
+        const particle = getParticle();
+        Object.assign(particle, {
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: PARTICLE_LIFE * 1.2,
+            maxLife: PARTICLE_LIFE * 1.2,
+            color: `hsl(${Math.random() * 360}, 100%, 70%)`
+        });
+        particles.push(particle);
+    }
+
+    // 外围扩散波
+    for (let i = 0; i < waveCount; i++) {
+        const angle = (Math.PI * 2 / waveCount) * i;
+        const speed = Math.random() * 2 + 6;
+        const particle = getParticle();
+        Object.assign(particle, {
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: PARTICLE_LIFE,
+            maxLife: PARTICLE_LIFE,
+            color: `hsl(${Math.random() * 60 + 180}, 100%, 60%)`
+        });
+        particles.push(particle);
+    }
+
+    // 闪光效果
+    for (let i = 0; i < flashCount; i++) {
+        const angle = (Math.PI * 2 / flashCount) * i;
+        const speed = Math.random() * 1 + 2;
+        const particle = getParticle();
+        Object.assign(particle, {
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: PARTICLE_LIFE * 0.7,
+            maxLife: PARTICLE_LIFE * 0.7,
+            color: '#ffffff'
+        });
+        particles.push(particle);
+    }
+
+    blastSound.currentTime = 0;
+    blastSound.play();
+}
 // 创建爆炸效果
 function createExplosion(x, y) {
     for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -376,15 +474,16 @@ function updateParticles() {
         particle.y += particle.vy;
         particle.life--;
         
-        // 绘制粒子
+        // 绘制粒子，使用缓动效果
         ctx.fillStyle = particle.color;
-        ctx.globalAlpha = particle.life / PARTICLE_LIFE;
+        ctx.globalAlpha = (particle.life / particle.maxLife) * 0.8;
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, 2, 0, Math.PI * 2);
         ctx.fill();
         
-        // 移除死亡粒子
+        // 回收死亡粒子
         if (particle.life <= 0) {
+            recycleParticle(particle);
             particles.splice(i, 1);
         }
     }
@@ -408,19 +507,23 @@ function update() {
     ctx.font = '24px Arial';
     ctx.textAlign = 'left';
     ctx.fillText('❤️'.repeat(lives), 10, 80);
-    ctx.fillText('🚀'.repeat(missilesNum), 10, 110);
-    
     // 绘制连续命中进度
     if (consecutiveHits > 0) {
         ctx.fillStyle = '#ffff00';
-        ctx.fillText('✨'.repeat(consecutiveHits), 10, 140);
+        ctx.fillText('✨'.repeat(consecutiveHits), 10, 110);
     }
+    ctx.fillText('🚀'.repeat(missilesNum), 10, 140);
+    ctx.fillText('💣'.repeat(bombNum), 10, 170);
     
     // 绘制英文单词，调整位置和样式
     ctx.fillStyle = '#fff';
     ctx.font = '32px Arial';
     ctx.textAlign = 'left';
+    let leftWordsNum = wordPairs.length - usedWords.size - 1;
     ctx.fillText(currentEnWord, 30, 50);
+    ctx.fillStyle = '#ffa';
+    ctx.font = '22px Arial';
+    ctx.fillText(`剩余单词个数 ${leftWordsNum}`, CANVAS_WIDTH - 260, 50);
     
     // 添加阴影效果
     ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
@@ -489,11 +592,14 @@ function update() {
       }
       drawAirplane();
     
-    // 更新和绘制子弹和导弹
+    // 更新和绘制子弹，导弹和炸弹
     ctx.fillStyle = '#ff0';
     bullets.forEach((bullet, index) => {
         bullet.y -= 5;
-        if (bullet.isMissile) {
+        if (bullet.isBomb) {
+            ctx.fillStyle = '#00f'; // 炸弹颜色为蓝色
+            ctx.fillRect(bullet.x, bullet.y, BOMB_WIDTH, BOMB_HEIGHT);
+        } else if (bullet.isMissile) {
             ctx.fillStyle = '#f00'; // 导弹颜色为红色
             ctx.fillRect(bullet.x, bullet.y, MISSILE_WIDTH, MISSILE_HEIGHT);
         } else {
@@ -519,7 +625,16 @@ function update() {
         
         // 检查碰撞
         bullets.forEach((bullet, bulletIndex) => {
-            if (checkCollision(bullet, word)) {
+            if (bullet.isBomb) {
+                if (bullet.y < word.y) {
+                    // 炸弹只要高度和单词一致，就清除所有单词
+                    bullets.splice(bulletIndex, 1);
+                    fallingWords.forEach(w => createBombExplosion(w.x, w.y));
+                    fallingWords = [];
+                    startNewRound();
+                }
+                return;
+            } else if (checkCollision(bullet, word)) {
                 bullets.splice(bulletIndex, 1);
                 fallingWords.splice(wordIndex, 1);
                 if (bullet.isMissile) {
@@ -536,6 +651,10 @@ function update() {
                     if (consecutiveHits >= CONSECUTIVE_HITS_FOR_MISSILE) {
                         missilesNum++;
                         consecutiveHits = 0;
+                        if (missilesNum >= CONSECUTIVE_MISSLE_FOR_BOMB) {
+                            bombNum++;
+                            missilesNum = 0;
+                        }
                     }
                     startNewRound();
                 } else {
