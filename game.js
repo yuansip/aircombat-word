@@ -12,6 +12,12 @@ const BOMB_WIDTH = 16;
 const BOMB_HEIGHT = 28;
 const CONSECUTIVE_HITS_FOR_MISSILE = 5; // 连续命中次数获得导弹
 const CONSECUTIVE_MISSLE_FOR_BOMB = 2; // 导弹数获得炸弹
+const TARGET_COUNT = 3; // 同时下落的单词数量
+const SHOW_EN_WORD = true;
+
+// 可调整的速度设置
+let WORD_SPEED = 1;
+let PLAYER_SPEED = 20;
 
 // 星空背景配置
 const STAR_COUNT = 60; // 星星数量
@@ -55,10 +61,6 @@ function recycleParticle(particle) {
 // 记录已出现的单词
 let usedWords = new Set();
 
-// 可调整的速度设置
-let WORD_SPEED = 1;
-let PLAYER_SPEED = 20;
-
 // 游戏状态
 let gameState = 'notStarted'; // 'notStarted', 'running', 'ended'
 
@@ -81,7 +83,7 @@ const wordPairs = [
     { en: 'snake', cn: '蛇' },
     { en: 'bird', cn: '鸟' },,
 ];
-
+let leftWordsNum = wordPairs.length;
 // 游戏状态
 let player = {
     x: CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2,
@@ -312,20 +314,21 @@ function startNewRound() {
     const randomPair = availableWords[Math.floor(Math.random() * availableWords.length)];
     currentEnWord = randomPair.en;
     usedWords.add(currentEnWord); // 记录已使用的单词
+    leftWordsNum = wordPairs.length - usedWords.size
     
     // 生成三个中文选项，包括正确答案
     const correctCn = randomPair.cn;
     let otherWords = wordPairs.filter(pair => pair.cn !== correctCn)
         .map(pair => pair.cn)
         .sort(() => Math.random() - 0.5)
-        .slice(0, 2);
+        .slice(0, TARGET_COUNT - 1);
     
     const cnWords = [correctCn, ...otherWords].sort(() => Math.random() - 0.5);
     
     // 创建下落的单词
     fallingWords = cnWords.map((word, index) => ({
         text: word,
-        x: index * (CANVAS_WIDTH / 3) + 50,
+        x: index * (CANVAS_WIDTH / TARGET_COUNT) + 50,
         y: 0,
         isCorrect: word === correctCn
     }));
@@ -519,11 +522,12 @@ function update() {
     ctx.fillStyle = '#fff';
     ctx.font = '32px Arial';
     ctx.textAlign = 'left';
-    let leftWordsNum = wordPairs.length - usedWords.size - 1;
-    ctx.fillText(currentEnWord, 30, 50);
+    if (SHOW_EN_WORD) {
+        ctx.fillText(currentEnWord, 30, 50);
+    }
     ctx.fillStyle = '#ffa';
     ctx.font = '22px Arial';
-    ctx.fillText(`剩余单词个数 ${leftWordsNum}`, CANVAS_WIDTH - 260, 50);
+    ctx.fillText(`剩余目标个数 ${leftWordsNum}`, CANVAS_WIDTH - 260, 50);
     
     // 添加阴影效果
     ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
@@ -619,12 +623,19 @@ function update() {
     // 更新和绘制下落的单词
     ctx.fillStyle = '#fff';
     ctx.font = '28px Arial';
+    let breakWordsLoop = false
     fallingWords.forEach((word, wordIndex) => {
         word.y += WORD_SPEED;
         ctx.fillText(word.text, word.x, word.y);
-        
+        if (breakWordsLoop) {
+            return;
+        }
+        let breakBulletsLoop = false
         // 检查碰撞
         bullets.forEach((bullet, bulletIndex) => {
+            if (breakBulletsLoop) {
+                return;
+            }
             if (bullet.isBomb) {
                 if (bullet.y < word.y) {
                     // 炸弹只要高度和单词一致，就清除所有单词
@@ -632,6 +643,8 @@ function update() {
                     fallingWords.forEach(w => createBombExplosion(w.x, w.y));
                     fallingWords = [];
                     startNewRound();
+                    breakWordsLoop = true;
+                    breakBulletsLoop = true;
                 }
                 return;
             } else if (checkCollision(bullet, word)) {
@@ -643,6 +656,8 @@ function update() {
                     fallingWords.forEach(w => createExplosion(w.x, w.y));
                     fallingWords = [];
                     startNewRound();
+                    breakWordsLoop = true;
+                    breakBulletsLoop = true;
                 } else if (word.isCorrect) {
                     // 击中正确单词
                     createExplosion(word.x, word.y);
@@ -657,6 +672,8 @@ function update() {
                         }
                     }
                     startNewRound();
+                    breakWordsLoop = true;
+                    breakBulletsLoop = true;
                 } else {
                     // 击中错误单词，剩余单词速度翻倍，并重置连续命中次数
                     consecutiveHits = 0;
@@ -684,6 +701,8 @@ function update() {
                 // 开始新回合
                 startNewRound();
             }
+            breakWordsLoop = true;
+            breakBulletsLoop = true;
         }
     });
 }
@@ -754,13 +773,13 @@ function initGameOverModal() {
 
 function playTTS(text) {
     // 创建语音对象
-const utterance = new SpeechSynthesisUtterance();
-utterance.text = text; // 设置朗读文本
-utterance.lang = 'en'; // 中文语音
-utterance.rate = 1.0; // 语速（0.1-10）
-utterance.pitch = 1.0; // 音调（0-2）
-utterance.volume = 0.5; // 音量（0-1）
-window.speechSynthesis.speak(utterance);
-  }
+    const utterance = new SpeechSynthesisUtterance();
+    utterance.text = text; // 设置朗读文本
+    utterance.lang = 'en'; // 中文语音
+    utterance.rate = 1.0; // 语速（0.1-10）
+    utterance.pitch = 1.0; // 音调（0-2）
+    utterance.volume = 0.8; // 音量（0-1）
+    window.speechSynthesis.speak(utterance);
+}
 // 启动游戏
 window.onload = initGame;
