@@ -13,7 +13,8 @@ const BOMB_HEIGHT = 28;
 const CONSECUTIVE_HITS_FOR_MISSILE = 5; // 连续命中次数获得导弹
 const CONSECUTIVE_MISSLE_FOR_BOMB = 2; // 导弹数获得炸弹
 const TARGET_COUNT = 3; // 同时下落的单词数量
-const SHOW_EN_WORD = true;
+const SHOW_WORD = true;
+const SPELL_MODE = true;
 
 // 可调整的速度设置
 let WORD_SPEED = 1;
@@ -81,7 +82,7 @@ const wordPairs = [
     { en: 'dog', cn: '狗' },
     { en: 'bull', cn: '公牛' },
     { en: 'snake', cn: '蛇' },
-    { en: 'bird', cn: '鸟' },,
+    { en: 'bird', cn: '鸟' }, ,
 ];
 let leftWordsNum = wordPairs.length;
 // 游戏状态
@@ -95,7 +96,7 @@ let missilesNum = 0; // 导弹数量
 let bombNum = 0; // 炸弹数量
 
 let bullets = [];
-let currentEnWord = '';
+let currentWord = '';
 let fallingWords = [];
 let gameLoop;
 let canvas, ctx;
@@ -109,22 +110,22 @@ function initGame() {
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
     ctx = canvas.getContext('2d');
-    
+
     // 初始化星星
     initStars();
-    
+
     // 初始化设置面板
     initSettings();
-    
+
     // 初始化游戏控制按钮
     initGameControls();
-    
+
     // 初始化游戏结束弹窗按钮
     initGameOverModal();
-    
+
     // 键盘事件监听
     document.addEventListener('keydown', handleKeyPress);
-    
+
     // 绘制初始画面
     drawInitialScreen();
 }
@@ -133,10 +134,10 @@ function initGame() {
 function initGameControls() {
     startButton = document.getElementById('startButton');
     endButton = document.getElementById('endButton');
-    
+
     startButton.addEventListener('click', startGame);
     endButton.addEventListener('click', endGame);
-    
+
     // 初始状态下结束按钮禁用
     endButton.disabled = true;
 }
@@ -147,7 +148,7 @@ function startGame() {
         gameState = 'running';
         startButton.disabled = true;
         endButton.disabled = false;
-        
+
         // 重置游戏数据
         bullets = [];
         fallingWords = [];
@@ -157,7 +158,7 @@ function startGame() {
         bombNum = 0; // 重置炸弹数量
         consecutiveHits = 0; // 重置连续命中次数
         usedWords.clear(); // 清空已使用单词记录
-        
+
         // 开始新回合
         startNewRound();
         gameLoop = setInterval(update, 16); // 约60fps
@@ -170,15 +171,15 @@ function endGame() {
         gameState = 'ended';
         startButton.disabled = false;
         endButton.disabled = true;
-        
+
         // 清除游戏循环
         clearInterval(gameLoop);
-        
+
         // 重置游戏数据
         bullets = [];
         fallingWords = [];
-        currentEnWord = '';
-        
+        currentWord = '';
+
         // 清空画布
         ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     }
@@ -209,7 +210,7 @@ function drawEndScreen() {
 function initSettings() {
     settingsPanel = document.getElementById('settingsPanel');
     settingsButton = document.getElementById('settingsButton');
-    
+
     // 设置按钮点击事件
     settingsButton.addEventListener('click', (e) => {
         e.stopPropagation(); // 阻止事件冒泡
@@ -219,7 +220,7 @@ function initSettings() {
 
     // 文件上传处理
     const wordFileInput = document.getElementById('wordFile');
-    wordFileInput.addEventListener('change', function(e) {
+    wordFileInput.addEventListener('change', function (e) {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -229,7 +230,7 @@ function initSettings() {
         }
 
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
             const text = e.target.result;
             const lines = text.split('\n');
             const newWordPairs = [];
@@ -249,10 +250,10 @@ function initSettings() {
                 // 显示上传成功弹窗
                 const uploadSuccessModal = document.getElementById('uploadSuccessModal');
                 uploadSuccessModal.style.display = 'block';
-                
+
                 // 确定按钮点击事件
                 const uploadOkButton = document.getElementById('uploadOkButton');
-                uploadOkButton.onclick = function() {
+                uploadOkButton.onclick = function () {
                     uploadSuccessModal.style.display = 'none';
                 };
             } else {
@@ -274,18 +275,18 @@ function initSettings() {
     settingsPanel.addEventListener('click', (e) => {
         e.stopPropagation();
     });
-    
+
     // 速度滑块事件
     const wordSpeedSlider = document.getElementById('wordSpeed');
     const wordSpeedValue = document.getElementById('wordSpeedValue');
     const playerSpeedSlider = document.getElementById('playerSpeed');
     const playerSpeedValue = document.getElementById('playerSpeedValue');
-    
+
     wordSpeedSlider.addEventListener('input', (e) => {
         WORD_SPEED = parseFloat(e.target.value);
         wordSpeedValue.textContent = WORD_SPEED;
     });
-    
+
     playerSpeedSlider.addEventListener('input', (e) => {
         PLAYER_SPEED = parseFloat(e.target.value);
         playerSpeedValue.textContent = PLAYER_SPEED;
@@ -297,7 +298,7 @@ function startNewRound() {
     // 重置单词下落速度
     WORD_SPEED = parseFloat(document.getElementById('wordSpeed').value);
     document.getElementById('wordSpeedValue').textContent = WORD_SPEED;
-    
+
     // 检查是否所有单词都已使用
     if (usedWords.size >= wordPairs.length) {
         // 显示通关弹窗
@@ -308,40 +309,94 @@ function startNewRound() {
         endGame();
         return;
     }
-    
+
     // 随机选择一个未使用的单词对
     let availableWords = wordPairs.filter(pair => !usedWords.has(pair.en));
     const randomPair = availableWords[Math.floor(Math.random() * availableWords.length)];
-    currentEnWord = randomPair.en;
-    usedWords.add(currentEnWord); // 记录已使用的单词
+    if (SPELL_MODE) {
+        currentWord = randomPair.cn;
+    } else {
+        currentWord = randomPair.en;
+    }
+    usedWords.add(randomPair.en); // 记录已使用的单词
     leftWordsNum = wordPairs.length - usedWords.size
-    
-    // 生成三个中文选项，包括正确答案
+
+    // 生成中文选项，包括正确答案
     const correctCn = randomPair.cn;
-    let otherWords = wordPairs.filter(pair => pair.cn !== correctCn)
-        .map(pair => pair.cn)
-        .sort(() => Math.random() - 0.5)
-        .slice(0, TARGET_COUNT - 1);
-    
-    const cnWords = [correctCn, ...otherWords].sort(() => Math.random() - 0.5);
-    
-    // 创建下落的单词
-    fallingWords = cnWords.map((word, index) => ({
-        text: word,
-        x: index * (CANVAS_WIDTH / TARGET_COUNT) + 50,
-        y: 0,
-        isCorrect: word === correctCn
-    }));
+    if (SPELL_MODE) {
+        fallingWords = [{
+            text: randomPair.en,
+            en: randomPair.en,
+            x: CANVAS_WIDTH / 2 - 20,
+            y: 0,
+            isCorrect: true
+        }];
+    } else {
+        let otherWords = wordPairs.filter(pair => pair.cn !== correctCn)
+            .map(pair => pair.cn)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, TARGET_COUNT - 1);
+
+        const cnWords = [correctCn, ...otherWords].sort(() => Math.random() - 0.5);
+
+        // 创建下落的单词
+        fallingWords = cnWords.map((word, index) => ({
+            text: word,
+            x: index * (CANVAS_WIDTH / TARGET_COUNT) + 50,
+            y: 0,
+            isCorrect: word === correctCn
+        }));
+    }
 
     // 朗读当前英文单词, 延迟1秒是为了避免和爆炸音效重叠，听不清单词发言
     setTimeout(() => {
-        playTTS(currentEnWord);
+        playTTS(currentWord);
     }, 1000); // 延迟1秒后播放
 }
 
-// 处理键盘输入
-function handleKeyPress(event) {
-    switch(event.key) {
+function handleKeyPressForSpellMode(event) {
+    if (/^[A-Za-z]$/.test(event.key)) {
+        bullets.push({
+            x: player.x + PLAYER_WIDTH / 2 - BULLET_WIDTH / 2,
+            y: player.y,
+            letter: event.key
+        });
+        playTTS(event.key);
+    } else if (event.key === ' ') {
+        if (missilesNum > 0) {
+            missilesNum--;
+            bullets.push({
+                x: player.x + PLAYER_WIDTH / 2 - MISSILE_WIDTH / 2,
+                y: player.y,
+                isMissile: true
+            });
+            missileSound.currentTime = 0;
+            missileSound.play(); // 播放导弹音效
+        }
+    } else if (event.key === 'Enter') {
+        if (bombNum > 0) {
+            bombNum--;
+            bullets.push({
+                x: player.x + PLAYER_WIDTH / 2 - BOMB_WIDTH / 2,
+                y: player.y,
+                isBomb: true
+            });
+            bombSound.currentTime = 0;
+            bombSound.play(); // 播放炸弹音效
+        }
+    } else if (event.key === 'ArrowLeft') {
+        if (player.x > 0) {
+            player.x -= PLAYER_SPEED;
+        }
+    } else if (event.key === 'ArrowRight') {
+        if (player.x < CANVAS_WIDTH - PLAYER_WIDTH) {
+            player.x += PLAYER_SPEED;
+        }
+    }
+}
+
+function handleKeyPressForSelectMode(event) {
+    switch (event.key) {
         case 'ArrowLeft':
             if (player.x > 0) {
                 player.x -= PLAYER_SPEED;
@@ -386,6 +441,14 @@ function handleKeyPress(event) {
                 bombSound.play(); // 播放炸弹音效
             }
             break;
+    }
+}
+// 处理键盘输入
+function handleKeyPress(event) {
+    if (SPELL_MODE) {
+        handleKeyPressForSpellMode(event);
+    } else {
+        handleKeyPressForSelectMode(event);
     }
 }
 
@@ -452,7 +515,7 @@ function createBombExplosion(x, y) {
     blastSound.play();
 }
 // 创建爆炸效果
-function createExplosion(x, y) {
+function createExplosion(x, y, silent = false) {
     for (let i = 0; i < PARTICLE_COUNT; i++) {
         const angle = (Math.PI * 2 / PARTICLE_COUNT) * i;
         const speed = Math.random() * 2 + 2;
@@ -465,8 +528,10 @@ function createExplosion(x, y) {
             color: `hsl(${Math.random() * 60 + 30}, 100%, 50%)` // 黄色到橙色的随机色
         });
     }
-    blastSound.currentTime = 0;
-    blastSound.play();
+    if (!silent) {
+        blastSound.currentTime = 0;
+        blastSound.play();
+    }
 }
 
 // 更新和绘制粒子
@@ -476,14 +541,14 @@ function updateParticles() {
         particle.x += particle.vx;
         particle.y += particle.vy;
         particle.life--;
-        
+
         // 绘制粒子，使用缓动效果
         ctx.fillStyle = particle.color;
         ctx.globalAlpha = (particle.life / particle.maxLife) * 0.8;
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, 2, 0, Math.PI * 2);
         ctx.fill();
-        
+
         // 回收死亡粒子
         if (particle.life <= 0) {
             recycleParticle(particle);
@@ -498,13 +563,13 @@ function update() {
     if (gameState !== 'running') {
         return;
     }
-    
+
     // 清空画布
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    
+
     // 绘制星空背景
     drawStars();
-    
+
     // 绘制生命值和导弹数量
     ctx.fillStyle = '#ff0000';
     ctx.font = '24px Arial';
@@ -517,18 +582,18 @@ function update() {
     }
     ctx.fillText('🚀'.repeat(missilesNum), 10, 140);
     ctx.fillText('💣'.repeat(bombNum), 10, 170);
-    
+
     // 绘制英文单词，调整位置和样式
     ctx.fillStyle = '#fff';
     ctx.font = '32px Arial';
     ctx.textAlign = 'left';
-    if (SHOW_EN_WORD) {
-        ctx.fillText(currentEnWord, 30, 50);
+    if (SHOW_WORD) {
+        ctx.fillText(currentWord, 30, 50);
     }
     ctx.fillStyle = '#ffa';
     ctx.font = '22px Arial';
     ctx.fillText(`剩余目标个数 ${leftWordsNum}`, CANVAS_WIDTH - 260, 50);
-    
+
     // 添加阴影效果
     ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
     ctx.shadowBlur = 5;
@@ -537,14 +602,14 @@ function update() {
 
     // 绘制小飞机
     function drawAirplane() {
-  
+
         // 机身（长方形）
         ctx.beginPath();
         ctx.rect(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT); // x=90, y=150, 宽度 20, 高度 50（底部 y=200）
         ctx.fill();
         ctx.strokeStyle = '#000';
         ctx.stroke();
-  
+
         // 机头（三角形）
         ctx.beginPath();
         ctx.moveTo(player.x, player.y);   // 机身顶部左侧 (y=150)
@@ -553,7 +618,7 @@ function update() {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-  
+
         // 左机翼（三角形）
         ctx.beginPath();
         ctx.moveTo(player.x, player.y + 20);   // 机身连接点 (y=170)
@@ -563,7 +628,7 @@ function update() {
         ctx.fillStyle = '#60A5FA'; // 浅蓝色
         ctx.fill();
         ctx.stroke();
-  
+
         // 右机翼（三角形）
         ctx.beginPath();
         ctx.moveTo(player.x + PLAYER_WIDTH, player.y + 20);  // 机身连接点 (y=170)
@@ -573,7 +638,7 @@ function update() {
         ctx.fillStyle = '#60A5FA';
         ctx.fill();
         ctx.stroke();
-  
+
         // 左尾翼（小三角形）
         ctx.beginPath();
         ctx.moveTo(player.x, player.y + PLAYER_HEIGHT - 10);   // 机身连接点 (y=190)
@@ -583,7 +648,7 @@ function update() {
         ctx.fillStyle = '#F97316'; // 橙色
         ctx.fill();
         ctx.stroke();
-  
+
         // 右尾翼（小三角形）
         ctx.beginPath();
         ctx.moveTo(player.x + PLAYER_WIDTH, player.y + PLAYER_HEIGHT - 10);  // 机身连接点 (y=190)
@@ -593,9 +658,9 @@ function update() {
         ctx.fillStyle = '#F97316';
         ctx.fill();
         ctx.stroke();
-      }
-      drawAirplane();
-    
+    }
+    drawAirplane();
+
     // 更新和绘制子弹，导弹和炸弹
     ctx.fillStyle = '#ff0';
     bullets.forEach((bullet, index) => {
@@ -610,16 +675,16 @@ function update() {
             ctx.fillStyle = '#ff0';
             ctx.fillRect(bullet.x, bullet.y, BULLET_WIDTH, BULLET_HEIGHT);
         }
-        
+
         // 移除超出屏幕的子弹
         if (bullet.y < 0) {
             bullets.splice(index, 1);
         }
     });
-    
+
     // 更新和绘制粒子
     updateParticles();
-    
+
     // 更新和绘制下落的单词
     ctx.fillStyle = '#fff';
     ctx.font = '28px Arial';
@@ -649,9 +714,9 @@ function update() {
                 return;
             } else if (checkCollision(bullet, word)) {
                 bullets.splice(bulletIndex, 1);
-                fallingWords.splice(wordIndex, 1);
                 if (bullet.isMissile) {
                     // 导弹命中，无论是否命中正确单词，都清除所有单词
+                    fallingWords.splice(wordIndex, 1);
                     createExplosion(word.x, word.y);
                     fallingWords.forEach(w => createExplosion(w.x, w.y));
                     fallingWords = [];
@@ -659,21 +724,33 @@ function update() {
                     breakWordsLoop = true;
                     breakBulletsLoop = true;
                 } else if (word.isCorrect) {
-                    // 击中正确单词
-                    createExplosion(word.x, word.y);
-                    // 普通子弹命中
-                    consecutiveHits++;
-                    if (consecutiveHits >= CONSECUTIVE_HITS_FOR_MISSILE) {
-                        missilesNum++;
-                        consecutiveHits = 0;
-                        if (missilesNum >= CONSECUTIVE_MISSLE_FOR_BOMB) {
-                            bombNum++;
-                            missilesNum = 0;
-                        }
+                    if (SPELL_MODE && bullet.letter.toLowerCase() === word.text[0].toLowerCase()) {
+                        // 拼写正确，继续拼写
+                        word.text = word.text.slice(1);
                     }
-                    startNewRound();
-                    breakWordsLoop = true;
-                    breakBulletsLoop = true;
+                    if (word.text === '' || word.en === '') {
+                        // 击中正确单词
+                        fallingWords.splice(wordIndex, 1);
+                        if (SPELL_MODE) {
+                            playTTS(word.en);
+                            createExplosion(word.x, word.y, true);
+                        } else {
+                            createExplosion(word.x, word.y);
+                        }
+                        // 普通子弹命中
+                        consecutiveHits++;
+                        if (consecutiveHits >= CONSECUTIVE_HITS_FOR_MISSILE) {
+                            missilesNum++;
+                            consecutiveHits = 0;
+                            if (missilesNum >= CONSECUTIVE_MISSLE_FOR_BOMB) {
+                                bombNum++;
+                                missilesNum = 0;
+                            }
+                        }
+                        startNewRound();
+                        breakWordsLoop = true;
+                        breakBulletsLoop = true;
+                    }
                 } else {
                     // 击中错误单词，剩余单词速度翻倍，并重置连续命中次数
                     consecutiveHits = 0;
@@ -682,7 +759,7 @@ function update() {
                 }
             }
         });
-        
+
         // 检查是否有单词落地
         if (word.y > CANVAS_HEIGHT) {
             lives--; // 减少一条生命
@@ -730,7 +807,7 @@ function drawStars() {
         if (star.brightness > 1 || star.brightness < 0) {
             star.twinkleSpeed = -star.twinkleSpeed;
         }
-        
+
         // 绘制星星
         ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
         ctx.beginPath();
@@ -744,11 +821,11 @@ function drawStars() {
 function checkCollision(bullet, word) {
     const wordWidth = ctx.measureText(word.text).width;
     const wordHeight = 24; // 假设字体高度为24px
-    
-    return bullet.x < word.x + wordWidth &&
-           bullet.x + BULLET_WIDTH > word.x &&
-           bullet.y < word.y &&
-           bullet.y + BULLET_HEIGHT > word.y - wordHeight;
+    const bias = PLAYER_SPEED
+    return bullet.x < word.x + bias + wordWidth &&
+        bullet.x + BULLET_WIDTH > word.x - bias &&
+        bullet.y < word.y &&
+        bullet.y + BULLET_HEIGHT > word.y - wordHeight;
 }
 
 // 初始化游戏结束弹窗按钮
@@ -756,13 +833,13 @@ function initGameOverModal() {
     const modal = document.getElementById('gameOverModal');
     const restartButton = document.getElementById('restartButton');
     const quitButton = document.getElementById('quitButton');
-    
-    restartButton.addEventListener('click', function() {
+
+    restartButton.addEventListener('click', function () {
         modal.style.display = 'none';
         startGame();
     });
-    
-    quitButton.addEventListener('click', function() {
+
+    quitButton.addEventListener('click', function () {
         modal.style.display = 'none';
         gameState = 'notStarted';
         startButton.disabled = false;
@@ -775,7 +852,7 @@ function playTTS(text) {
     // 创建语音对象
     const utterance = new SpeechSynthesisUtterance();
     utterance.text = text; // 设置朗读文本
-    utterance.lang = 'en'; // 中文语音
+    utterance.lang = 'zh-CN'; // 中文语音
     utterance.rate = 1.0; // 语速（0.1-10）
     utterance.pitch = 1.0; // 音调（0-2）
     utterance.volume = 0.8; // 音量（0-1）
