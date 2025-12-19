@@ -14,7 +14,7 @@ const CONSECUTIVE_HITS_FOR_MISSILE = 5; // 连续命中次数获得导弹
 const CONSECUTIVE_MISSLE_FOR_BOMB = 2; // 导弹数获得炸弹
 const TARGET_COUNT = 3; // 同时下落的单词数量
 const SHOW_WORD = true;
-const SPELL_MODE = true;
+let SPELL_MODE = true; // 可通过UI切换
 
 // 可调整的速度设置
 let WORD_SPEED = 1;
@@ -134,9 +134,15 @@ function initGame() {
 function initGameControls() {
     startButton = document.getElementById('startButton');
     endButton = document.getElementById('endButton');
+    const gameModeSelect = document.getElementById('gameMode');
 
     startButton.addEventListener('click', startGame);
     endButton.addEventListener('click', endGame);
+
+    // 模式选择
+    gameModeSelect.addEventListener('change', (e) => {
+        SPELL_MODE = e.target.value === 'spell';
+    });
 
     // 初始状态下结束按钮禁用
     endButton.disabled = true;
@@ -148,6 +154,7 @@ function startGame() {
         gameState = 'running';
         startButton.disabled = true;
         endButton.disabled = false;
+        document.getElementById('gameMode').disabled = true;
 
         // 重置游戏数据
         bullets = [];
@@ -171,6 +178,7 @@ function endGame() {
         gameState = 'ended';
         startButton.disabled = false;
         endButton.disabled = true;
+        document.getElementById('gameMode').disabled = false;
 
         // 清除游戏循环
         clearInterval(gameLoop);
@@ -728,7 +736,8 @@ function update() {
                         // 拼写正确，继续拼写
                         word.text = word.text.slice(1);
                     }
-                    if (word.text === '' || word.en === '') {
+                    // 选择模式直接消除，拼写模式需要拼完整个单词
+                    if (!SPELL_MODE || word.text === '') {
                         // 击中正确单词
                         fallingWords.splice(wordIndex, 1);
                         if (SPELL_MODE) {
