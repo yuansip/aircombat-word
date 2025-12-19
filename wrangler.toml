@@ -1,0 +1,5 @@
+name = "aircombat-word"  # 项目名
+compatibility_date = "2025-12-19"
+
+[assets]
+directory = "./"  # 静态文件目录，如果在 dist 文件夹就填 "./dist"
